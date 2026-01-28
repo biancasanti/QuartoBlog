@@ -1,0 +1,16 @@
+---
+title: "New Post!"
+author: "Bianca Santi"
+date: "2026-01-28"
+format: html
+categories: [code, news]
+---
+
+Hello! This is my new trial post. 
+
+```{r}
+
+print("Hello!")
+
+```
+

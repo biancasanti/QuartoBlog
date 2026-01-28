@@ -1,0 +1,15 @@
+{
+  "hash": "36d64558c331a50ed596e0a4bc9bb42c",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"New Post!\"\nauthor: \"Bianca Santi\"\ndate: \"2026-01-28\"\nformat: html\ncategories: [code, news]\n---\n\nHello! This is my new trial post. \n\n\n::: {.cell}\n\n```{.r .cell-code}\nprint(\"Hello!\")\n```\n\n::: {.cell-output .cell-output-stdout}\n\n```\n[1] \"Hello!\"\n```\n\n\n:::\n:::\n\n\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}

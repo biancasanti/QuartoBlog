@@ -1,0 +1,17 @@
+---
+title: "Post With Code"
+author: "Bianca Santi"
+date: "2026-01-28"
+categories: [news, code, analysis]
+image: "image.jpg"
+---
+
+This is a post with executable code.
+
+```{r}
+1 + 1
+```
+
+```{python}
+1 + 2
+```
