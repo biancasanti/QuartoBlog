@@ -69,6 +69,92 @@ This dataset is structured hierarchically: each student belongs to a classroom, 
 Over the course of this tutorial, we'll be exploring the effect of the school-level, classroom-level, and student-level variables on the students' gain in math scores between kindergarten and first grade.
 
 
+
+# Why not use simple linear models?
+
+
+When looking at this dataset, we could form a simple naive hypothesis: for example, that the scores students get in kindergarten are related to the scores they get in first grade. We can make a scatter plot for these two variables in a smaller subset of the data (just for visualization purposes) to see if this naive hypothesis matches the data. 
+
+```{r}
+
+SII_toy_data <- SIIdata %>%
+  slice_head(n = 200)
+
+ggplot(SII_toy_data, aes(x = mathkind, y = mathgain)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Change in math scores based on kindergarten scores", 
+       x = "Kindergarten math achievement score", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+```
+
+Indeed, that seems to be the case! The linear line of best fit shows a correlation between kindergarten scores and score gain, with students that scored higher in kindergarten having a lower gain from kindergarten to first grade. This makes sense: higher scores leave less room for improvement, while students with initially lower scores have much more potential to improve. However, it could also be possible to have a classroom environment where the teacher is better at supporting already high-achieving students, while lower-achieving students don't get as much support and therefore improve less. 
+
+Is more improvement for initially lower-scoring students a global phenomenon, or is the opposite effect also possible? To begin answering this question, we can try looking at the same plot as above, but this time visualize the different classrooms and add in a trend line for each classroom. 
+
+
+```{r}
+
+ggplot(SII_toy_data, 
+       aes(x = mathkind, y = mathgain, color = classid)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Change in math scores based on kindergarten scores", 
+       subtitle = "Grouping by classroom",
+       x = "Kindergarten math achievement score", 
+       y = "Gain in math scores from kindergarten to first grade") +
+    theme(legend.position = "none")
+
+
+```
+
+When we group the data this way, the picture that emerges is a bit more complicated: some classrooms still show the overall effect, with lower initial scores being correlated with more score gain. Some classrooms show the effect even more strongly with steeper downwards trend lines. However, some classrooms show the opposite effect: a higher initial score is correlated with more gain. This suggests that the relationship between kindergarten scores and score gain in first grade is not as simple as it may initially seem, and it might depend on some classroom-level variables, such as how effective the teacher is at teaching first grade math. 
+
+
+Another naive hypothesis we might form is that children from higher socioeconomic backgrounds (high SES) might have a higher gain in math scores. Once again, we can explore this hypothesis with a scatter plot in our subset of the data.
+
+```{r}
+
+ggplot(SII_toy_data, aes(x = ses, y = mathgain)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Change in math scores based on kindergarten scores", 
+       x = "Socioeconomic status", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+
+```
+
+If we plot the score gain against SES within the same subset of the data, however, this doesn't seem to be the case: the linear trend line for this correlation is basically flat. This might be because there is no correlation between SES and math score gain, but it might also be because the correlation between these factors is variable. For example, it could be that some school districts have more resources to support lower-income students and therefore have more flat or even decreasing trend lines, but in other school districts with less resources lower-income students aren't able to increase their score as much. Once again, we can begin to uncover this variation by plotting the data with different trend lines for each school.  
+
+
+```{r}
+
+ggplot(SII_toy_data, 
+       aes(x = ses, y = mathgain, color = schoolid)) +
+  geom_point() +
+  labs(title = "Change in math scores based on kindergarten scores", 
+       subtitle = "Grouping by school",
+       x = "Socioeconomic status", 
+       y = "Gain in math scores from kindergarten to first grade") +
+  theme(legend.position = "none") +
+  geom_smooth(method = "lm", se = FALSE)
+  
+```
+
+While the overall correlation was pretty flat, plotting the trend lines for each school shows a lot more variation: in some schools SES is positively correlated with score increases, in others the correlation is flat, and in one district the correlation is negative, so that higher income students improve their scores less. Once again, grouping the data revealed substantial variation, this time at the level of the school, which suggests that the relationship between SES and math score gain might be influenced by school-level variables. 
+
+
+These examples illustrate a common issue with using simple linear models to explain relationships in complicated, real-world datasets: simple linear models assume each data point is independent, while in the real world data points are often grouped and interdependent. Simple linear models can't account for the fact that students in the same classroom are probably more similar than students in different classrooms, and classrooms in the same school are probably more similar than classrooms in different schools. They also can't account for the variation that exists between groups: each grouping variable (classroom and school) can have different means for each variable and different slopes for relationships between variables. 
+
+Mixed effects models allow us to deal with this complexity in a dataset: they are made for dealing with data points that are not independent and are instead clustered or nested. Because of that, they can capture more of the meaningful variation in complex datasets like this and produce much more accurate predictions. 
+
+
+
+
+
+
 # References
 
 ::: {#refs} 
