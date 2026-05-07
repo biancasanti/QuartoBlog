@@ -6,11 +6,10 @@ format: html
 categories: [code, news]
 ---
 
-Hello! This is my new trial post. 
+Hello! This is my new trial post.
 
 ```{r}
 
 print("Hello!")
 
 ```
-

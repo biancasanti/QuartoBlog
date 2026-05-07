@@ -10,7 +10,134 @@
 <atom:link href="https://your-website-url.example.com/index.xml" rel="self" type="application/rss+xml"/>
 <description>A blog built with Quarto</description>
 <generator>quarto-1.8.25</generator>
-<lastBuildDate>Wed, 28 Jan 2026 05:00:00 GMT</lastBuildDate>
+<lastBuildDate>Fri, 08 May 2026 04:00:00 GMT</lastBuildDate>
+<item>
+  <title>Introduction to Mixed Effects Modeling</title>
+  <dc:creator>Bianca Santi</dc:creator>
+  <link>https://your-website-url.example.com/posts/mixed_effects_modeling/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<p>In this tutorial, you will learn what mixed effects linear models are, what situations they should be used in, and how to use them to analyze data in R.</p>
+<p>The plan for the tutorial would be to describe what linear mixed effects models are, explore the effect of adding random intercepts and slopes for different grouping variables, discussing steps in the analysis process (including what to do to choose the best model), and mentioning alternatives like hierarchical Bayes.</p>
+<section id="setup" class="level2">
+<h2 class="anchored" data-anchor-id="setup">Setup</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(tidyverse)</span>
+<span id="cb1-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(lme4)</span>
+<span id="cb1-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(broom.mixed)</span>
+<span id="cb1-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(lmerTest)</span>
+<span id="cb1-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(patchwork)</span>
+<span id="cb1-6"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(ggdist)</span>
+<span id="cb1-7"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(effects)</span>
+<span id="cb1-8"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(gt)</span>
+<span id="cb1-9"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(parameters)</span>
+<span id="cb1-10"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(knitr)</span>
+<span id="cb1-11"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(nlmeU)</span></code></pre></div></div>
+</div>
+</section>
+<section id="loading-the-data" class="level2">
+<h2 class="anchored" data-anchor-id="loading-the-data">Loading the data</h2>
+<p>For this tutorial we’ll be using a dataset included in the nlmeU package. This data comes from the Study of Structural Improvement (SII) Project, which aimed to assess match achievement scores for first and third graders in randomly selected classrooms at elementary schools across the US <span class="citation" data-cites="hill_effects_2005">(Hill, Rowan, and Ball 2005)</span>. The dataset contains data from 1,190 first graders sampled from 312 classrooms in 107 schools.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># load the data from the nlmeU package</span></span>
+<span id="cb2-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data</span>(SIIdata)</span>
+<span id="cb2-3"></span>
+<span id="cb2-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># visualize information for the dataframe </span></span>
+<span id="cb2-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str</span>(SIIdata)</span></code></pre></div></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>'data.frame':   1190 obs. of  12 variables:
+ $ sex     : Factor w/ 2 levels "M","F": 2 1 2 1 1 2 1 1 2 1 ...
+ $ minority: Factor w/ 2 levels "Mnrt=No","Mnrt=Yes": 2 2 2 2 2 2 2 2 2 2 ...
+ $ mathkind: int  448 460 511 449 425 450 452 443 422 480 ...
+ $ mathgain: int  32 109 56 83 53 65 51 66 88 -7 ...
+ $ ses     : num  0.46 -0.27 -0.03 -0.38 -0.03 0.76 -0.03 0.2 0.64 0.13 ...
+ $ yearstea: num  1 1 1 2 2 2 2 2 2 2 ...
+ $ mathknow: num  NA NA NA -0.11 -0.11 -0.11 -0.11 -0.11 -0.11 -0.11 ...
+ $ housepov: num  0.082 0.082 0.082 0.082 0.082 0.082 0.082 0.082 0.082 0.082 ...
+ $ mathprep: num  2 2 2 3.25 3.25 3.25 3.25 3.25 3.25 3.25 ...
+ $ classid : Factor w/ 312 levels "1","2","3","4",..: 160 160 160 217 217 217 217 217 217 217 ...
+ $ schoolid: Factor w/ 107 levels "1","2","3","4",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ childid : Factor w/ 1190 levels "1","2","3","4",..: 1 2 3 4 5 6 7 8 9 10 ...</code></pre>
+</div>
+</div>
+<p>This dataset is structured hierarchically: each student belongs to a classroom, and each classroom belongs to a school. The 12 variables in the dataset are:</p>
+<ul>
+<li>school-level variables:
+<ul>
+<li><code>schoolid</code>: ID number for the school (factor)</li>
+<li><code>housepov</code>: percentage of households below the poverty line in the school’s neighborhood (numeric)</li>
+</ul></li>
+<li>classroom-level variables:
+<ul>
+<li><code>classid</code>: ID number for the classroom (factor)</li>
+<li><code>yearstea</code>: teacher’s years of experience for teaching, in first grade (numeric)</li>
+<li><code>mathknow</code>: how well the teacher knows the first grade math curriculum, with higher scores indicating more knowledge (numeric)</li>
+<li><code>mathprep</code>: how many courses on first grade math knowledge the teacher follows (numeric)</li>
+</ul></li>
+<li>student-level variables:
+<ul>
+<li><code>childid</code>: ID number for the student (factor)</li>
+<li><code>sex</code>: the student’s sex (factor with labeled levels 1 (M) and 2 (F))</li>
+<li><code>minority</code>: whether or not the student has minority status (factor with labeled levels 1 (Mnrt=No) and 2 (Mnrt=Yes))</li>
+<li><code>mathkind</code>: the student’s math score in the spring of kindergarten (numeric, integer)</li>
+<li><code>mathgain</code>: the student’s grain in math score from the spring of kindergarten to the spring of first grade (numeric, integer)</li>
+<li><code>ses</code>: the student’s socioeconomic status (numeric)</li>
+</ul></li>
+</ul>
+<p>Over the course of this tutorial, we’ll be exploring the effect of the school-level, classroom-level, and student-level variables on the students’ gain in math scores between kindergarten and first grade.</p>
+</section>
+<section id="references" class="level1">
+<h1>References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-hill_effects_2005" class="csl-entry">
+Hill, Heather C., Brian Rowan, and Deborah Loewenberg Ball. 2005. <span>“Effects of <span>Teachers</span>’ <span>Mathematical</span> <span>Knowledge</span> for <span>Teaching</span> on <span>Student</span> <span>Achievement</span>.”</span> <em>American Educational Research Journal</em> 42 (2): 371–406. <a href="https://doi.org/10.3102/00028312042002371">https://doi.org/10.3102/00028312042002371</a>.
+</div>
+</div>
+
+
+</section>
+
+ ]]></description>
+  <category>code</category>
+  <category>analysis</category>
+  <category>final project</category>
+  <guid>https://your-website-url.example.com/posts/mixed_effects_modeling/</guid>
+  <pubDate>Fri, 08 May 2026 04:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Post With Code</title>
   <dc:creator>Bianca Santi</dc:creator>

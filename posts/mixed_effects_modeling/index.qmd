@@ -1,0 +1,75 @@
+---
+title: "Introduction to Mixed Effects Modeling"
+subtitle: "Statistics Final Project (PSY 504)"
+author: "Bianca Santi"
+date: "2026-05-08"
+format: html
+categories: [code, analysis, final project]
+bibliography: references.bib
+---
+
+In this tutorial, you will learn what mixed effects linear models are, what situations they should be used in, and how to use them to analyze data in R.
+
+The plan for the tutorial would be to describe what linear mixed effects models are, explore the effect of adding random intercepts and slopes for different grouping variables, discussing steps in the analysis process (including what to do to choose the best model), and mentioning alternatives like hierarchical Bayes.
+
+
+## Setup
+
+```{r}
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(lme4)
+library(broom.mixed)
+library(lmerTest)
+library(patchwork)
+library(ggdist)
+library(effects)
+library(gt)
+library(parameters)
+library(knitr)
+library(nlmeU)
+
+```
+
+## Loading the data
+
+For this tutorial we'll be using a dataset included in the nlmeU package. This data comes from the Study of Structural Improvement (SII) Project, which aimed to assess match achievement scores for first and third graders in randomly selected classrooms at elementary schools across the US [@hill_effects_2005]. The dataset contains data from 1,190 first graders sampled from 312 classrooms in 107 schools. 
+
+
+```{r}
+
+# load the data from the nlmeU package
+data(SIIdata)
+
+# visualize information for the dataframe 
+str(SIIdata)
+
+```
+
+This dataset is structured hierarchically: each student belongs to a classroom, and each classroom belongs to a school. The 12 variables in the dataset are: 
+
+* school-level variables: 
+  + `schoolid`: ID number for the school (factor)
+  + `housepov`: percentage of households below the poverty line in the school's neighborhood (numeric)
+* classroom-level variables: 
+  + `classid`: ID number for the classroom (factor)
+  + `yearstea`: teacher's years of experience for teaching, in first grade (numeric) 
+  + `mathknow`: how well the teacher knows the first grade math curriculum, with higher scores indicating more knowledge (numeric)
+  + `mathprep`: how many courses on first grade math knowledge the teacher follows (numeric)
+* student-level variables:
+  + `childid`: ID number for the student (factor)
+  + `sex`: the student's sex (factor with labeled levels 1 (M) and 2 (F))
+  + `minority`: whether or not the student has minority status (factor with labeled levels 1 (Mnrt=No) and 2 (Mnrt=Yes))
+  + `mathkind`: the student's math score in the spring of kindergarten (numeric, integer)
+  + `mathgain`: the student's grain in math score from the spring of kindergarten to the spring of first grade (numeric, integer)
+  + `ses`: the student's socioeconomic status (numeric)
+
+Over the course of this tutorial, we'll be exploring the effect of the school-level, classroom-level, and student-level variables on the students' gain in math scores between kindergarten and first grade.
+
+
+# References
+
+::: {#refs} 
+:::
