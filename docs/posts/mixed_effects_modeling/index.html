@@ -371,12 +371,14 @@ div.csl-indent {
 </div>
 <p>While the overall correlation was pretty flat, plotting the trend lines for each school shows a lot more variation: in some schools SES is positively correlated with score increases, in others the correlation is flat, and in one district the correlation is negative, so that higher income students improve their scores less. Once again, grouping the data revealed substantial variation, this time at the level of the school, which suggests that the relationship between SES and math score gain might be influenced by school-level variables.</p>
 <p>These examples illustrate a common issue with using simple linear models to explain relationships in complicated, real-world datasets: simple linear models assume each data point is independent, while in the real world data points are often grouped and interdependent. Simple linear models can’t account for the fact that students in the same classroom are probably more similar than students in different classrooms, and classrooms in the same school are probably more similar than classrooms in different schools. They also can’t account for the variation that exists between groups: each grouping variable (classroom and school) can have different means for each variable and different slopes for relationships between variables.</p>
-<p>Mixed effects models allow us to deal with this complexity in a dataset: they are made for dealing with data points that are not independent and are instead clustered or nested. Because of that, they can capture more of the meaningful variation in complex datasets like this and produce much more accurate predictions.</p>
+<p>Mixed effects models allow us to deal with this complexity in a dataset: they are made for dealing with data points that are not independent and are instead clustered or nested. Because of that, they can capture more of the meaningful variation in complex datasets like this and produce much more accurate predictions. Using mixed effects models is preferable when dealing with datasets that feature nested designs (such as the SII dataset we’re using here), repeated measures for each participant, longitudinal data, or generally complex designs.</p>
 </section>
 <section id="manually-building-a-mixed-effects-model" class="level1">
 <h1>Manually building a mixed effects model</h1>
+<section id="starting-with-a-simple-linear-model" class="level3">
+<h3 class="anchored" data-anchor-id="starting-with-a-simple-linear-model">Starting with a simple linear model</h3>
 <p>In a simple linear model, a linear correlation is fit to the data and each data point is assumed to be independent, so any variation between groups is assumed to be normally distributed error.</p>
-<p>In a subset of the data, we could fit a linear model for the relationship between kindergarten math scores and math score gain. We can use the <code>lm</code> package to fit a simple linear model that predicts math score gain based on kindergarten math scores (<code>mathgain ~ ses</code>); we are assuming that all other variation in the data is random error.</p>
+<p>In a subset of the data, we could fit a linear model for the relationship between kindergarten math scores and math score gain. We can use the <code>lm</code> function to fit a simple linear model that predicts math score gain based on kindergarten math scores (<code>mathgain ~ ses</code>); we are assuming that all other variation in the data is random error.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># take a smaller subset (n = 100) for visualization purposes</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>SII_toy_data <span class="ot">&lt;-</span> SII_toy_data <span class="sc">%&gt;%</span> <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">100</span>)</span>
@@ -426,8 +428,15 @@ F-statistic: 6.985 on 1 and 98 DF,  p-value: 0.009569</code></pre>
 </div>
 </div>
 </div>
+</section>
+<section id="adding-random-intercepts" class="level3">
+<h3 class="anchored" data-anchor-id="adding-random-intercepts">Adding random intercepts</h3>
 <p>One of the way that mixed effects models can account for variation between grouping variables is by adding random intercepts. Instead of assuming one intercept for the line of best fit across all the data, we can allow the intercept to vary between groups, so that each group has its own intercept (but the same slope). This means that the variance in intercepts (or conceptually, in the average math score gain) between different classrooms is no longer modeled as error, but is instead modeled as a distribution of deviations from the overall mean intercept.</p>
-<p>To do this in R, we can use the <code>lmer</code> package to fit a mixed effects model that still predicts math score gain based on kindergarten math scores (<code>mathgain ~ mathkind</code>), but this time adds in a term for random intercepts for each classroom <code>(1 | classid)</code>. This model has two components: * fixed (or constant) effects - population-level effects that persist across groups. In our case, this is the population-level intercept and slope for the effect of kindergarten math scores. * random effects - effects that vary for each group and model additional variation as a distribution around the fixed effects. In our case, we are adding in one random effect: random intercepts for each classroom.</p>
+<p>To do this in R, we can use the <code>lmer</code> function from the <code>lmerTest</code> package to fit a mixed effects model that still predicts math score gain based on kindergarten math scores (<code>mathgain ~ mathkind</code>), but this time adds in a term for random intercepts for each classroom <code>(1 | classid)</code>. This model has two components:</p>
+<ul>
+<li>Fixed (or constant) effects - population-level effects that persist across groups. In our case, this is the population-level intercept and slope for the effect of kindergarten math scores.</li>
+<li>Random effects - effects that vary for each group and model additional variation as a distribution around the fixed effects. In our case, we are adding in one random effect: random intercepts for each classroom.</li>
+</ul>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>toy_intercept_kind <span class="ot">&lt;-</span> <span class="fu">lmer</span>(mathgain <span class="sc">~</span> mathkind <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> schoolid), <span class="at">data =</span> SII_toy_data)</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(toy_intercept_kind)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -483,6 +492,9 @@ mathkind -0.994</code></pre>
 </div>
 </div>
 </div>
+</section>
+<section id="adding-random-slopes" class="level3">
+<h3 class="anchored" data-anchor-id="adding-random-slopes">Adding random slopes</h3>
 <p>The other random effect that we can account for with a mixed effects model is different slopes for each group. Instead of assuming that the slope of the predicted line must be the same across all groups, we can add in a random slopes term and allow the slope to vary between groups. This means that the variance in slopes (conceptually, the relationship between kindergarten scores and score gains) between different classrooms is no longer modeled as an error, but is instead considered a distribution of deviations from the overall population-level slope.</p>
 <p>We can add this change to our previous model, so that now each group has both its own intercept and its own slope. With the <code>lmer</code> package, we can now fit a mixed effects model that predicts math score gain based on kindergarten math scores (<code>mathgain ~ mathkind</code>) and adds in terms for random intercepts for each classroom <code>(1 | classid)</code> and random slopes for the effect of kindergarten math scores by classroom <code>(mathkind | classid)</code>, which are combined into <code>(1 + mathkind | classid)</code>.</p>
 <div class="cell">
@@ -546,6 +558,139 @@ boundary (singular) fit: see help('isSingular')</code></pre>
 </div>
 </div>
 </div>
+</section>
+</section>
+<section id="mixed-effects-modeling-in-r" class="level1">
+<h1>Mixed effects modeling in R</h1>
+<p>Now that we know the added features of mixed effects models, random effects (random intercepts and random slopes), we can go over how to implement mixed effects modeling in R. In this tutorial, we’ll be using the <code>lmerTest</code> package to implement all mixed effects models. The general workflow for modeling data with mixed effects models is:</p>
+<ol type="1">
+<li>Exploring relationships between variables</li>
+<li>Implementing model(s)</li>
+<li>Model comparison</li>
+<li>Interpreting model coefficients</li>
+</ol>
+<p>Let’s go through these steps one by one.</p>
+<section id="exploring-relationships-between-variables" class="level2">
+<h2 class="anchored" data-anchor-id="exploring-relationships-between-variables">Exploring relationships between variables</h2>
+<p>Visualizing data is always a helpful first step before doing statistical modeling. In our case, without any a priori hypotheses or analysis plan, visualizing the data and relationships between variables also helps us determine what variables should be included in our statistical models.</p>
+<p>One helpful visualization (that we’ve already used above) during data exploration is a scatterplot, which we can use to understand the relationships between continuous variables. Since we’re interested in modeling the gain in math scores between kindergarten and first grade, we can create scatterplots with the <code>mathgain</code> variable on the y axis and other continuous variables on the x axis. Let’s start with kindergarten math scores (<code>mathkind</code>), this time looking at the full sample instead of a subset.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(SIIdata, <span class="fu">aes</span>(<span class="at">x =</span> mathkind, <span class="at">y =</span> mathgain)) <span class="sc">+</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Kindergarten math achievement score"</span>, </span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From this, we can see that the full sample has a fairly even spread in both math gain scores and in kindergarten scores (with the exception of some very low potential outlier values for kindergarten scores). The two variables still seem to be negatively correlated in the full sample, which means kindergarten scores are likely a useful variable to include in our models.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(SIIdata, <span class="fu">aes</span>(<span class="at">x =</span> ses, <span class="at">y =</span> mathgain)) <span class="sc">+</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Socioeconomic status"</span>, </span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We can also look at SES. In the full sample, there still doesn’t seem to be a strong relationship between SES and score gain.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(SIIdata, <span class="fu">aes</span>(<span class="at">x =</span> yearstea, <span class="at">y =</span> mathgain)) <span class="sc">+</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Teacher's years of teaching experience"</span>, </span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(SIIdata, <span class="fu">aes</span>(<span class="at">x =</span> mathknow, <span class="at">y =</span> mathgain)) <span class="sc">+</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Teacher's math knowledge"</span>, </span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-15-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(SIIdata, <span class="fu">aes</span>(<span class="at">x =</span> mathprep, <span class="at">y =</span> mathgain)) <span class="sc">+</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Teacher's math prep courses"</span>, </span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-15-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>When we look at classroom-level variables, we don’t observe any noticeable correlations between gain in math scores and the teacher’s years of teaching experience, level of math knowledge, or amount of math courses they follow. Based on this, these variables might be excluded from our statistical models for the sake of simplicity.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(SIIdata, <span class="fu">aes</span>(<span class="at">x =</span> housepov, <span class="at">y =</span> mathgain)) <span class="sc">+</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Percentage of houses below poverty level in school neighborhood"</span>, </span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-16-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The final variable we can explore with a scatterplot is the percentage of houses below poverty level in school neighborhood (<code>housepov</code>), which is a school-level variable.</p>
+<p>Some of the other predictor variables are not continuous but rather categorical factors and can’t be visualized with scatterplots. For these, we can visualize their relationship with <code>mathgain</code> using plots that show the data distribution for each category, such as violin plots.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(SIIdata, <span class="fu">aes</span>(<span class="at">x =</span> sex, <span class="at">y =</span> mathgain)) <span class="sc">+</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_violin</span>() <span class="sc">+</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Student's sex"</span>, </span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(SIIdata, <span class="fu">aes</span>(<span class="at">x =</span> minority, <span class="at">y =</span> mathgain)) <span class="sc">+</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_violin</span>() <span class="sc">+</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Student's minority status"</span>, </span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-18-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The two categorical student-level variables, sex and minority status seem to correlate with score gain a bit, since the distributions look slightly wider and have lower means for the female and minority students.</p>
+<p>Now that we’ve visualized some of the variance in our data, we can move on to building mixed effects models to model our data.</p>
+</section>
+<section id="implementing-different-models" class="level2">
+<h2 class="anchored" data-anchor-id="implementing-different-models">Implementing different models</h2>
+</section>
+<section id="model-comparison" class="level2">
+<h2 class="anchored" data-anchor-id="model-comparison">Model comparison</h2>
+</section>
+<section id="interpreting-model-coefficients" class="level2">
+<h2 class="anchored" data-anchor-id="interpreting-model-coefficients">Interpreting model coefficients</h2>
+</section>
 </section>
 <section id="references" class="level1">
 <h1>References</h1>

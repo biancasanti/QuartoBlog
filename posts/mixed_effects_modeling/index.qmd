@@ -148,14 +148,16 @@ While the overall correlation was pretty flat, plotting the trend lines for each
 
 These examples illustrate a common issue with using simple linear models to explain relationships in complicated, real-world datasets: simple linear models assume each data point is independent, while in the real world data points are often grouped and interdependent. Simple linear models can't account for the fact that students in the same classroom are probably more similar than students in different classrooms, and classrooms in the same school are probably more similar than classrooms in different schools. They also can't account for the variation that exists between groups: each grouping variable (classroom and school) can have different means for each variable and different slopes for relationships between variables. 
 
-Mixed effects models allow us to deal with this complexity in a dataset: they are made for dealing with data points that are not independent and are instead clustered or nested. Because of that, they can capture more of the meaningful variation in complex datasets like this and produce much more accurate predictions. 
+Mixed effects models allow us to deal with this complexity in a dataset: they are made for dealing with data points that are not independent and are instead clustered or nested. Because of that, they can capture more of the meaningful variation in complex datasets like this and produce much more accurate predictions. Using mixed effects models is preferable when dealing with datasets that feature nested designs (such as the SII dataset we're using here), repeated measures for each participant, longitudinal data, or generally complex designs. 
 
 
 # Manually building a mixed effects model
 
+### Starting with a simple linear model
+
 In a simple linear model, a linear correlation is fit to the data and each data point is assumed to be independent, so any variation between groups is assumed to be normally distributed error. 
 
-In a subset of the data, we could fit a linear model for the relationship between kindergarten math scores and math score gain. We can use the `lm` package to fit a simple linear model that predicts math score gain based on kindergarten math scores (`mathgain ~ ses`); we are assuming that all other variation in the data is random error. 
+In a subset of the data, we could fit a linear model for the relationship between kindergarten math scores and math score gain. We can use the `lm` function to fit a simple linear model that predicts math score gain based on kindergarten math scores (`mathgain ~ ses`); we are assuming that all other variation in the data is random error. 
 
 ```{r}
 
@@ -187,11 +189,14 @@ ggplot(SII_toy_data,
 
 ```
 
+### Adding random intercepts
+
 One of the way that mixed effects models can account for variation between grouping variables is by adding random intercepts. Instead of assuming one intercept for the line of best fit across all the data, we can allow the intercept to vary between groups, so that each group has its own intercept (but the same slope). This means that the variance in intercepts (or conceptually, in the average math score gain) between different classrooms is no longer modeled as error, but is instead modeled as a distribution of deviations from the overall mean intercept. 
 
-To do this in R, we can use the `lmer` package to fit a mixed effects model that still predicts math score gain based on kindergarten math scores (`mathgain ~ mathkind`), but this time adds in a term for random intercepts for each classroom `(1 | classid)`. This model has two components:
-* fixed (or constant) effects - population-level effects that persist across groups. In our case, this is the population-level intercept and slope for the effect of kindergarten math scores.
-* random effects - effects that vary for each group and model additional variation as a distribution around the fixed effects. In our case, we are adding in one random effect: random intercepts for each classroom.
+To do this in R, we can use the `lmer` function from the `lmerTest` package to fit a mixed effects model that still predicts math score gain based on kindergarten math scores (`mathgain ~ mathkind`), but this time adds in a term for random intercepts for each classroom `(1 | classid)`. This model has two components:
+
+* Fixed (or constant) effects - population-level effects that persist across groups. In our case, this is the population-level intercept and slope for the effect of kindergarten math scores.
+* Random effects - effects that vary for each group and model additional variation as a distribution around the fixed effects. In our case, we are adding in one random effect: random intercepts for each classroom.
 
 
 ```{r}
@@ -221,6 +226,7 @@ ggplot(SII_toy_data,
 
 ```
 
+### Adding random slopes
 
 The other random effect that we can account for with a mixed effects model is different slopes for each group. Instead of assuming that the slope of the predicted line must be the same across all groups, we can add in a random slopes term and allow the slope to vary between groups. This means that the variance in slopes (conceptually, the relationship between kindergarten scores and score gains) between different classrooms is no longer modeled as an error, but is instead considered a distribution of deviations from the overall population-level slope.
 
@@ -254,6 +260,125 @@ ggplot(SII_toy_data,
        y = "Gain in math scores from kindergarten to first grade")
 
 ```
+
+
+# Mixed effects modeling in R 
+
+Now that we know the added features of mixed effects models, random effects (random intercepts and random slopes), we can go over how to implement mixed effects modeling in R. In this tutorial, we'll be using the `lmerTest` package to implement all mixed effects models. The general workflow for modeling data with mixed effects models is: 
+
+1. Exploring relationships between variables
+2. Implementing model(s)
+3. Model comparison
+4. Interpreting model coefficients
+
+Let's go through these steps one by one. 
+
+
+## Exploring relationships between variables 
+
+Visualizing data is always a helpful first step before doing statistical modeling. In our case, without any a priori hypotheses or analysis plan, visualizing the data and relationships between variables also helps us determine what variables should be included in our statistical models. 
+
+One helpful visualization (that we've already used above) during data exploration is a scatterplot, which we can use to understand the relationships between continuous variables. Since we're interested in modeling the gain in math scores between kindergarten and first grade, we can create scatterplots with the `mathgain` variable on the y axis and other continuous variables on the x axis. Let's start with kindergarten math scores (`mathkind`), this time looking at the full sample instead of a subset. 
+
+
+```{r}
+
+ggplot(SIIdata, aes(x = mathkind, y = mathgain)) +
+  geom_point() +
+  labs(x = "Kindergarten math achievement score", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+```
+
+From this, we can see that the full sample has a fairly even spread in both math gain scores and in kindergarten scores (with the exception of some very low potential outlier values for kindergarten scores). The two variables still seem to be negatively correlated in the full sample, which means kindergarten scores are likely a useful variable to include in our models. 
+
+
+
+```{r}
+
+ggplot(SIIdata, aes(x = ses, y = mathgain)) +
+  geom_point() +
+  labs(x = "Socioeconomic status", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+```
+
+We can also look at SES. In the full sample, there still doesn't seem to be a strong relationship between SES and score gain. 
+
+
+```{r}
+#| warning: false
+
+ggplot(SIIdata, aes(x = yearstea, y = mathgain)) +
+  geom_point() +
+  labs(x = "Teacher's years of teaching experience", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+
+ggplot(SIIdata, aes(x = mathknow, y = mathgain)) +
+  geom_point() +
+  labs(x = "Teacher's math knowledge", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+
+ggplot(SIIdata, aes(x = mathprep, y = mathgain)) +
+  geom_point() +
+  labs(x = "Teacher's math prep courses", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+```
+
+When we look at classroom-level variables, we don't observe any noticeable correlations between gain in math scores and the teacher's years of teaching experience, level of math knowledge, or amount of math courses they follow. Based on this, these variables might be excluded from our statistical models for the sake of simplicity.
+
+
+```{r}
+
+ggplot(SIIdata, aes(x = housepov, y = mathgain)) +
+  geom_point() +
+  labs(x = "Percentage of houses below poverty level in school neighborhood", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+```
+
+The final variable we can explore with a scatterplot is the percentage of houses below poverty level in school neighborhood (`housepov`), which is a school-level variable. 
+
+Some of the other predictor variables are not continuous but rather categorical factors and can't be visualized with scatterplots. For these, we can visualize their relationship with `mathgain` using plots that show the data distribution for each category, such as violin plots. 
+
+```{r}
+
+ggplot(SIIdata, aes(x = sex, y = mathgain)) +
+  geom_violin() +
+  labs(x = "Student's sex", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+
+```
+
+
+```{r}
+
+ggplot(SIIdata, aes(x = minority, y = mathgain)) +
+  geom_violin() +
+  labs(x = "Student's minority status", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+```
+
+The two categorical student-level variables, sex and minority status seem to correlate with score gain a bit, since the distributions look slightly wider and have lower means for the female and minority students. 
+
+Now that we've visualized some of the variance in our data, we can move on to building mixed effects models to model our data.
+
+
+## Implementing different models
+
+
+
+
+## Model comparison 
+
+
+## Interpreting model coefficients
+
 
 
 
