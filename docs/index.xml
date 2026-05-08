@@ -411,6 +411,434 @@ font-style: inherit;">FALSE</span>)</span></code></pre></div></div>
 <p>These examples illustrate a common issue with using simple linear models to explain relationships in complicated, real-world datasets: simple linear models assume each data point is independent, while in the real world data points are often grouped and interdependent. Simple linear models can’t account for the fact that students in the same classroom are probably more similar than students in different classrooms, and classrooms in the same school are probably more similar than classrooms in different schools. They also can’t account for the variation that exists between groups: each grouping variable (classroom and school) can have different means for each variable and different slopes for relationships between variables.</p>
 <p>Mixed effects models allow us to deal with this complexity in a dataset: they are made for dealing with data points that are not independent and are instead clustered or nested. Because of that, they can capture more of the meaningful variation in complex datasets like this and produce much more accurate predictions.</p>
 </section>
+<section id="manually-building-a-mixed-effects-model" class="level1">
+<h1>Manually building a mixed effects model</h1>
+<p>In a simple linear model, a linear correlation is fit to the data and each data point is assumed to be independent, so any variation between groups is assumed to be normally distributed error.</p>
+<p>In a subset of the data, we could fit a linear model for the relationship between kindergarten math scores and math score gain. We can use the <code>lm</code> package to fit a simple linear model that predicts math score gain based on kindergarten math scores (<code>mathgain ~ ses</code>); we are assuming that all other variation in the data is random error.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># take a smaller subset (n = 100) for visualization purposes</span></span>
+<span id="cb12-2">SII_toy_data <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> SII_toy_data <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%&gt;%</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">slice_head</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">n =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>)</span>
+<span id="cb12-3"></span>
+<span id="cb12-4">toy_lm_kind <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">lm</span>(mathgain <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> mathkind, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">data =</span> SII_toy_data)</span>
+<span id="cb12-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">summary</span>(toy_lm_kind)</span></code></pre></div></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = mathgain ~ mathkind, data = SII_toy_data)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-180.472  -16.397   -0.255   15.386  106.609 
+
+Coefficients:
+            Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept) 187.7663    47.8021   3.928 0.000159 ***
+mathkind     -0.2703     0.1023  -2.643 0.009569 ** 
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 35.73 on 98 degrees of freedom
+Multiple R-squared:  0.06654,   Adjusted R-squared:  0.05701 
+F-statistic: 6.985 on 1 and 98 DF,  p-value: 0.009569</code></pre>
+</div>
+</div>
+<p>As we expected from the trend line above, the relationship between math score increase and kindergarten math scores is significant and negative: students with higher scores in kindergarten generally improve less by third grade (p &lt; 0.01).</p>
+<p>When we plot the model predictions for each of the different classrooms in this subset of the data, we can see how the linear model doesn’t track group-level effects: the slope and intercept (height on the plot) of the trend line is exactly the same for each of the classrooms. This means that the trend lines don’t fit the classroom-level data very well: some of them are too high or too low with respect to the data points, and the slopes don’t match the classroom-level trends well either.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1">SII_toy_data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>pred_lm_kind <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">predict</span>(toy_lm_kind)</span>
+<span id="cb14-2"></span>
+<span id="cb14-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(SII_toy_data, </span>
+<span id="cb14-4">       <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> mathkind)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb14-5">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> mathgain), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span>.<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb14-6">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">facet_wrap</span>(<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span>schoolid) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb14-7">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_line</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y=</span>pred_lm_kind), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">col =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"red"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb14-8">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Linear model fit for each classroom"</span>, </span>
+<span id="cb14-9">       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">subtitle =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"mathgain ~ mathkind"</span>,</span>
+<span id="cb14-10">       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Kindergarten math achievement score"</span>, </span>
+<span id="cb14-11">       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://your-website-url.example.com/posts/mixed_effects_modeling/index_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>One of the way that mixed effects models can account for variation between grouping variables is by adding random intercepts. Instead of assuming one intercept for the line of best fit across all the data, we can allow the intercept to vary between groups, so that each group has its own intercept (but the same slope). This means that the variance in intercepts (or conceptually, in the average math score gain) between different classrooms is no longer modeled as error, but is instead modeled as a distribution of deviations from the overall mean intercept.</p>
+<p>To do this in R, we can use the <code>lmer</code> package to fit a mixed effects model that still predicts math score gain based on kindergarten math scores (<code>mathgain ~ mathkind</code>), but this time adds in a term for random intercepts for each classroom <code>(1 | classid)</code>. This model has two components: * fixed (or constant) effects - population-level effects that persist across groups. In our case, this is the population-level intercept and slope for the effect of kindergarten math scores. * random effects - effects that vary for each group and model additional variation as a distribution around the fixed effects. In our case, we are adding in one random effect: random intercepts for each classroom.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1">toy_intercept_kind <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">lmer</span>(mathgain <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> mathkind <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|</span> schoolid), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">data =</span> SII_toy_data)</span>
+<span id="cb15-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">summary</span>(toy_intercept_kind)</span></code></pre></div></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: mathgain ~ mathkind + (1 | schoolid)
+   Data: SII_toy_data
+
+REML criterion at convergence: 990.3
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-4.9892 -0.5209  0.0190  0.4826  3.3163 
+
+Random effects:
+ Groups   Name        Variance Std.Dev.
+ schoolid (Intercept)  175.4   13.24   
+ Residual             1118.4   33.44   
+Number of obs: 100, groups:  schoolid, 10
+
+Fixed effects:
+            Estimate Std. Error       df t value Pr(&gt;|t|)    
+(Intercept) 195.1796    50.2853  92.9179   3.881 0.000194 ***
+mathkind     -0.2897     0.1076  93.6131  -2.692 0.008415 ** 
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+         (Intr)
+mathkind -0.994</code></pre>
+</div>
+</div>
+<p>This model still shows a significant negative relationship between math score increase and kindergarten math scores (p = 0.011). However, it is now also modeling variance in intercepts for each classroom, which accounts for ~18% (231 / (231 + 1065)) of the total variance in the data.</p>
+<p>When we visualize the predictions from this model for each classroom, we can notice that the predictions for each classroom still have the same slope but now vary in intercept (height) and capture the differences in average math score gains between classrooms a bit better.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1">SII_toy_data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>pred_intercept_kind <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">predict</span>(toy_intercept_kind)</span>
+<span id="cb17-2"></span>
+<span id="cb17-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(SII_toy_data, </span>
+<span id="cb17-4">       <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> mathkind)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb17-5">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> mathgain), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span>.<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb17-6">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">facet_wrap</span>(<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span>schoolid) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb17-7">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_line</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y=</span>pred_intercept_kind), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">col =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"blue"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb17-8">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Random intercepts fit for each classroom"</span>, </span>
+<span id="cb17-9">       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">subtitle =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"mathgain ~ mathkind + (1 | classid)"</span>, </span>
+<span id="cb17-10">       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Kindergarten math achievement score"</span>, </span>
+<span id="cb17-11">       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://your-website-url.example.com/posts/mixed_effects_modeling/index_files/figure-html/unnamed-chunk-10-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The other random effect that we can account for with a mixed effects model is different slopes for each group. Instead of assuming that the slope of the predicted line must be the same across all groups, we can add in a random slopes term and allow the slope to vary between groups. This means that the variance in slopes (conceptually, the relationship between kindergarten scores and score gains) between different classrooms is no longer modeled as an error, but is instead considered a distribution of deviations from the overall population-level slope.</p>
+<p>We can add this change to our previous model, so that now each group has both its own intercept and its own slope. With the <code>lmer</code> package, we can now fit a mixed effects model that predicts math score gain based on kindergarten math scores (<code>mathgain ~ mathkind</code>) and adds in terms for random intercepts for each classroom <code>(1 | classid)</code> and random slopes for the effect of kindergarten math scores by classroom <code>(mathkind | classid)</code>, which are combined into <code>(1 + mathkind | classid)</code>.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1">toy_intercept_slopes_kind <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">lmer</span>(mathgain <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> mathkind <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> mathkind <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|</span> schoolid), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">data =</span> SII_toy_data)</span></code></pre></div></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>boundary (singular) fit: see help('isSingular')</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">summary</span>(toy_intercept_slopes_kind)</span></code></pre></div></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: mathgain ~ mathkind + (1 + mathkind | schoolid)
+   Data: SII_toy_data
+
+REML criterion at convergence: 989.6
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-4.9218 -0.5069  0.0124  0.4703  3.3255 
+
+Random effects:
+ Groups   Name        Variance  Std.Dev. Corr  
+ schoolid (Intercept) 1.109e+03 33.30499       
+          mathkind    1.917e-03  0.04379 -1.00 
+ Residual             1.112e+03 33.35262       
+Number of obs: 100, groups:  schoolid, 10
+
+Fixed effects:
+            Estimate Std. Error       df t value Pr(&gt;|t|)    
+(Intercept) 195.8090    50.5916  56.7392    3.87 0.000283 ***
+mathkind     -0.2909     0.1069  91.2390   -2.72 0.007817 ** 
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+         (Intr)
+mathkind -0.994
+optimizer (nloptwrap) convergence code: 0 (OK)
+boundary (singular) fit: see help('isSingular')</code></pre>
+</div>
+</div>
+<p>Once again, this model shows a significant negative relationship between math score increase and kindergarten math scores (p &lt; 0.01). This model is still modeling variance in intercepts for each classroom, which accounts for ~50% (1109 / (1109 + 1112 + 0.001917)) of the total variance, and is now also modeling variance in slopes for each classrooms, which doesn’t actually account for much of the variance (&lt; 0.0001%). This means that adding random slopes didn’t do too much to improve model fit.</p>
+<p>We can still visualize the predictions from this model for each classroom, but because the random slopes didn’t account for a lot of the variance we can’t really see noticeable differences in slopes between each classroom. However, if the addition of random slopes was more impactful, we would be able to see that the predictions for each classroom not only vary in intercept (height) but also in slopes to capture the spread of the data a bit better.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1">SII_toy_data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>pred_intercept_slopes_kind <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">predict</span>(toy_intercept_slopes_kind)</span>
+<span id="cb22-2"></span>
+<span id="cb22-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(SII_toy_data, </span>
+<span id="cb22-4">       <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> mathkind)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb22-5">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> mathgain), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span>.<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb22-6">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">facet_wrap</span>(<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span>schoolid) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb22-7">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_line</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y=</span>pred_intercept_slopes_kind), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">col =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"orange"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb22-8">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Random intercepts + slopes fit for each classroom"</span>,</span>
+<span id="cb22-9">       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">subtitle =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"mathgain ~ mathkind + (1 + mathkind | classid)"</span>,</span>
+<span id="cb22-10">       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Kindergarten math achievement score"</span>, </span>
+<span id="cb22-11">       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Gain in math scores from kindergarten to first grade"</span>)</span></code></pre></div></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://your-website-url.example.com/posts/mixed_effects_modeling/index_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
 <section id="references" class="level1">
 <h1>References</h1>
 <div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">

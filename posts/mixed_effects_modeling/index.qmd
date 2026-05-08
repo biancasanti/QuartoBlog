@@ -151,6 +151,112 @@ These examples illustrate a common issue with using simple linear models to expl
 Mixed effects models allow us to deal with this complexity in a dataset: they are made for dealing with data points that are not independent and are instead clustered or nested. Because of that, they can capture more of the meaningful variation in complex datasets like this and produce much more accurate predictions. 
 
 
+# Manually building a mixed effects model
+
+In a simple linear model, a linear correlation is fit to the data and each data point is assumed to be independent, so any variation between groups is assumed to be normally distributed error. 
+
+In a subset of the data, we could fit a linear model for the relationship between kindergarten math scores and math score gain. We can use the `lm` package to fit a simple linear model that predicts math score gain based on kindergarten math scores (`mathgain ~ ses`); we are assuming that all other variation in the data is random error. 
+
+```{r}
+
+# take a smaller subset (n = 100) for visualization purposes
+SII_toy_data <- SII_toy_data %>% slice_head(n = 100)
+
+toy_lm_kind <- lm(mathgain ~ mathkind, data = SII_toy_data)
+summary(toy_lm_kind)
+
+```
+
+As we expected from the trend line above, the relationship between math score increase and kindergarten math scores is significant and negative: students with higher scores in kindergarten generally improve less by third grade (p < 0.01). 
+
+When we plot the model predictions for each of the different classrooms in this subset of the data, we can see how the linear model doesn't track group-level effects: the slope and intercept (height on the plot) of the trend line is exactly the same for each of the classrooms. This means that the trend lines don't fit the classroom-level data very well: some of them are too high or too low with respect to the data points, and the slopes don't match the classroom-level trends well either. 
+
+```{r}
+
+SII_toy_data$pred_lm_kind <- predict(toy_lm_kind)
+
+ggplot(SII_toy_data, 
+       aes(x = mathkind)) +
+  geom_point(aes(y = mathgain), size=1, alpha=.3) +
+  facet_wrap(~schoolid) +
+  geom_line(aes(y=pred_lm_kind), col = "red") +
+  labs(title = "Linear model fit for each classroom", 
+       subtitle = "mathgain ~ mathkind",
+       x = "Kindergarten math achievement score", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+```
+
+One of the way that mixed effects models can account for variation between grouping variables is by adding random intercepts. Instead of assuming one intercept for the line of best fit across all the data, we can allow the intercept to vary between groups, so that each group has its own intercept (but the same slope). This means that the variance in intercepts (or conceptually, in the average math score gain) between different classrooms is no longer modeled as error, but is instead modeled as a distribution of deviations from the overall mean intercept. 
+
+To do this in R, we can use the `lmer` package to fit a mixed effects model that still predicts math score gain based on kindergarten math scores (`mathgain ~ mathkind`), but this time adds in a term for random intercepts for each classroom `(1 | classid)`. This model has two components:
+* fixed (or constant) effects - population-level effects that persist across groups. In our case, this is the population-level intercept and slope for the effect of kindergarten math scores.
+* random effects - effects that vary for each group and model additional variation as a distribution around the fixed effects. In our case, we are adding in one random effect: random intercepts for each classroom.
+
+
+```{r}
+
+toy_intercept_kind <- lmer(mathgain ~ mathkind + (1 | schoolid), data = SII_toy_data)
+summary(toy_intercept_kind)
+
+```
+
+This model still shows a significant negative relationship between math score increase and kindergarten math scores (p = 0.011). However, it is now also modeling variance in intercepts for each classroom, which accounts for ~18% (231 / (231 + 1065)) of the total variance in the data. 
+
+When we visualize the predictions from this model for each classroom, we can notice that the predictions for each classroom still have the same slope but now vary in intercept (height) and capture the differences in average math score gains between classrooms a bit better. 
+
+```{r}
+
+SII_toy_data$pred_intercept_kind <- predict(toy_intercept_kind)
+
+ggplot(SII_toy_data, 
+       aes(x = mathkind)) +
+  geom_point(aes(y = mathgain), size=1, alpha=.3) +
+  facet_wrap(~schoolid) +
+  geom_line(aes(y=pred_intercept_kind), col = "blue") +
+  labs(title = "Random intercepts fit for each classroom", 
+       subtitle = "mathgain ~ mathkind + (1 | classid)", 
+       x = "Kindergarten math achievement score", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+```
+
+
+The other random effect that we can account for with a mixed effects model is different slopes for each group. Instead of assuming that the slope of the predicted line must be the same across all groups, we can add in a random slopes term and allow the slope to vary between groups. This means that the variance in slopes (conceptually, the relationship between kindergarten scores and score gains) between different classrooms is no longer modeled as an error, but is instead considered a distribution of deviations from the overall population-level slope.
+
+We can add this change to our previous model, so that now each group has both its own intercept and its own slope. With the `lmer` package, we can now fit a mixed effects model that predicts math score gain based on kindergarten math scores (`mathgain ~ mathkind`) and adds in terms for random intercepts for each classroom `(1 | classid)` and random slopes for the effect of kindergarten math scores by classroom `(mathkind | classid)`, which are combined into `(1 + mathkind | classid)`.
+
+```{r}
+
+toy_intercept_slopes_kind <- lmer(mathgain ~ mathkind + (1 + mathkind | schoolid), data = SII_toy_data)
+summary(toy_intercept_slopes_kind)
+
+```
+
+Once again, this model  shows a significant negative relationship between math score increase and kindergarten math scores (p < 0.01). This model is still modeling variance in intercepts for each classroom, which accounts for ~50% (1109 / (1109 + 1112 + 0.001917)) of the total variance, and is now also modeling variance in slopes for each classrooms, which doesn't actually account for much of the variance (< 0.0001%). This means that adding random slopes didn't do too much to improve model fit.   
+
+We can still visualize the predictions from this model for each classroom, but because the random slopes didn't account for a lot of the variance we can't really see noticeable differences in slopes between each classroom. However, if the addition of random slopes was more impactful, we would be able to see that the predictions for each classroom not only vary in intercept (height) but also in slopes to capture the spread of the data a bit better. 
+
+
+
+```{r}
+
+SII_toy_data$pred_intercept_slopes_kind <- predict(toy_intercept_slopes_kind)
+
+ggplot(SII_toy_data, 
+       aes(x = mathkind)) +
+  geom_point(aes(y = mathgain), size=1, alpha=.3) +
+  facet_wrap(~schoolid) +
+  geom_line(aes(y=pred_intercept_slopes_kind), col = "orange") +
+  labs(title = "Random intercepts + slopes fit for each classroom",
+       subtitle = "mathgain ~ mathkind + (1 + mathkind | classid)",
+       x = "Kindergarten math achievement score", 
+       y = "Gain in math scores from kindergarten to first grade")
+
+```
+
+
+
 
 
 
