@@ -10,8 +10,6 @@ bibliography: references.bib
 
 In this tutorial, you will learn what mixed effects linear models are, what situations they should be used in, and how to use them to analyze data in R.
 
-The plan for the tutorial would be to describe what linear mixed effects models are, explore the effect of adding random intercepts and slopes for different grouping variables, discussing steps in the analysis process (including what to do to choose the best model), and mentioning alternatives like hierarchical Bayes.
-
 
 ## Setup
 
@@ -30,6 +28,7 @@ library(gt)
 library(parameters)
 library(knitr)
 library(nlmeU)
+library(easystats)
 
 ```
 
@@ -269,7 +268,7 @@ Now that we know the added features of mixed effects models, random effects (ran
 1. Exploring relationships between variables
 2. Implementing model(s)
 3. Model comparison
-4. Interpreting model coefficients
+4. Interpreting model outputs
 
 Let's go through these steps one by one. 
 
@@ -371,19 +370,163 @@ Now that we've visualized some of the variance in our data, we can move on to bu
 
 ## Implementing different models
 
+In order to implement a mixed effects model, we need to decide which fixed and random effects to include in our model structure. The fixed effects represent individual predictors, while random effects reflect effects at the group (classroom or school) level. 
+
+In our case, we can build a model that predicts the gain in math scores from all student-level predictors (sex, minority status, kindergarten math scores, and SES), the school-level predictor of percentage of households under the poverty level, and one classroom-level predictor that we think might make an impact: years of teaching experience for the classroom teacher. If we assume each of these predictors acts independently, the fixed effects for our model are `sex + minority + mathkind + ses + housepov + yearstea`. 
+
+We can also add in random intercepts for both of the grouping levels we have in our dataset, classrooms and schools, since we expect each to have different baseline levels of gain in math scores. That means that the random effects structure for our first model is `(1 | classid) + (1 | schoolid)`. 
+
+Altogether, this first mixed effects model predicts gain in math scores from the combination of fixed and random effects: `mathgain ~ sex + minority + mathkind + ses + housepov + yearstea + (1 | classid) + (1 | schoolid)`. We can call it like so using the `lmer function`:
+
+
+```{r}
+#| warning: false
+
+model1 <- lmer(mathgain ~ sex + minority + mathkind + ses + housepov + yearstea 
+               + (1 | classid) + (1 | schoolid), 
+               data = SIIdata)
+
+```
+
+We can then use the `summary()` function to see the model output.
+
+```{r}
+
+summary(model1)
+
+```
+
+From this, we can see that the random effects we added account for some amount of the variance, and that we have significant effects of minority status, math scores from kindergarten, and socioeconomic status on the gain in math scores. 
+
+We could complicate this model a bit if we have reason to believe that the slopes for some effects could also vary by group. For instance, we might think that the relationship between kindergarten scores and score gain might depend on classroom-level effects, such as teacher characteristics. We could also think that the relationship between SES and math gain could vary between schools. To add these hypotheses to our model, we need to add random slopes for these predictors, which means that our full random effects structure is `(1 + mathkind | classid) + (1 + ses | schoolid)`. We can implement and summarize this second model using the following syntax:
+
+
+```{r}
+#| warning: false
+
+model2 <- lmer(mathgain ~ sex + minority + mathkind + yearstea + ses + housepov  
+               + (1 + mathkind | classid) + (1 + ses| schoolid), 
+               data = SIIdata)
+summary(model2)
+
+```
+
+However, here we run into one of our first issues with mixed effects models: they can fail to converge if the random effects structure is too complicated. To fix this issue, we can remove one of the random slopes we added in to make the model simpler. In order to make this decision, we remove the random slope that had the smallest effect on the residuals, which in this case is the random slope for kindergarten scores by classroom (`mathkind`).  
+
+
+```{r}
+#| warning: false
+
+model2 <- lmer(mathgain ~ sex + minority + mathkind + yearstea + ses + housepov  
+               + (1 | classid) + (1 + ses| schoolid), 
+               data = SIIdata)
+summary(model2)
+
+```
+
+This model with both random intercepts and random slopes converges, and once again shows a reduction in residual variance through the random effects and significant main effects of minority status, kindergarten math scores, and SES. 
+
+
+But what if we don't think that each of the fixed effects predictors has an independent effect? For instance, we might think that the relationship between kingergarten scores and gain in math scores depends on the years of teaching experience that the teacher has, or that the effect of SES on score gain is moderated by the poverty level in the notebook. In order to implement this, we can add interactions to our fixed effects: an interaction between kindergarten scores and years of teaching experience, `mathkind * yearstea`, and an interaction between SES and neighborhood poverty levels, `ses * housepov`. We don't need to specify the fixed effects for each of these variables separately, since the syntax for interaction effects also allows us to calculate the independent effects. With this addition, our third model can be called like this:  
+
+
+```{r}
+#| warning: false
+
+model3 <- lmer(mathgain ~ sex + minority + mathkind * yearstea + ses * housepov  
+               + (1 | classid) + (1 + ses | schoolid), 
+               data = SIIdata)
+summary(model3)
+
+```
+Once again, this model shows some of the residual variance being accounted for by the random effects and significant main effects of minority status, kindergarten math scores, and SES. Neither of the interactions we added, however, were significant. 
 
 
 
 ## Model comparison 
 
+Now that we know how to implement mixed effects models, we're left with the very important question of how to choose which model fits the data the best. As you've seen above, we can create several different models to predict one outcome with the same set of predictors in a complex dataset like this one. How do we know which one to use?
 
-## Interpreting model coefficients
+One way to resolve this issue is to specify the model ahead of time, before running the analysis, based on your hypotheses (for example, in a preregistration). However, even prespecified models might fail to converge, or you might need to justify using a more complex or simpler model than a different option you might have chosen.
+
+To help in our decision-making, we can use the `test_likelihoodratio` function from the `easystats` package, which performs a likelihood ratio test to test which model is a better (more likely) explanation for the data. Crucially, however, this test only works on *nested* models, which means that all the predictors for one model (the smaller one) should be present in the bigger model.
+
+Let's use this test to compare two of the models we created earlier: one with just random intercepts by classroom and school (`model1`) and one with an added random slope for SES by school (`model 2`). 
 
 
+```{r}
+
+test_likelihoodratio(model1, model2, estimator = "REML")
+
+```
+
+Here, we are using the REML estimator, since the models we are comparing only differ in random effects structure but have identical fixed effects structure. The likelihood ratio test indicates that the addition of random slopes by school for SES did not significantly improve model fit (p = 0.540). That means we can drop the random slope and just use the model with the random intercepts. 
 
 
+We can also compare our `model1` to slightly more complex models that keep the same random effects structure but include interactions for in the fixed effects. 
+
+Let's create a `model4` with an interaction between `mathkind` and `yearstea`, a `model5` with an interaction between `ses` and `housepov`, and a `model6` with both interaction terms.  
 
 
+```{r}
+#| warning: false
+
+model4 <- lmer(mathgain ~ sex + minority + mathkind * yearstea + ses + housepov  
+               + (1 | classid) + (1 | schoolid), 
+               data = SIIdata)
+
+model5 <- lmer(mathgain ~ sex + minority + mathkind + yearstea + ses * housepov  
+               + (1 | classid) + (1 | schoolid), 
+               data = SIIdata)
+
+model6 <- lmer(mathgain ~ sex + minority + mathkind * yearstea + ses * housepov  
+               + (1 | classid) + (1 | schoolid), 
+               data = SIIdata)
+
+```
+
+We can now compare all of these models to model1 using the likelihood ratio test, this time with the ML estimator since we are comparing models with the same random effects but different fixed effects. 
+
+```{r}
+
+test_likelihoodratio(model1, model4, estimator = "ML")
+
+```
+
+```{r}
+
+test_likelihoodratio(model1, model5, estimator = "ML")
+
+```
+
+```{r}
+
+test_likelihoodratio(model1, model6, estimator = "ML")
+
+```
+Through this, we can see that none of the added interaction effects served to significantly improve our model, so `model1`, out of all the models we explored, seems to provide the best fit to our data.
+
+
+## Interpreting model outputs
+
+Now that we have our best-fitting model, how do we interpret its outputs? Let's take a look at the model summary again:
+
+```{r}
+
+summary(model1)
+
+```
+
+The random effects portion of the model output shows us how much variance each random effect accounts for. Here, we can see that both of our group random intercepts account for a good amount of the variance in the model, but there is still substantial residual variance. 
+
+The fixed effects portion of the model output shows the estimate, standard error, and p values for each of our fixed effects coefficients. For a continuous predictor, like kindergarten math scores, we can interpret the estimate as showing us the estimated change in our outcome (gain in math scores) based on a one-unit increase in the predictor: in this case, scoring one more point in kindergarten predicts -0.47 less points of gain by first grade. For a categorical predictor, like minority status, the estimate shows the estimated change in the outcome for a certain predictor category relative to the reference category. For minority status, the reference level is "no", so we can interpret the estimate as showing that minority students on average have 7.72 less points of math score gains compared to non-minority students. By looking at the p values, we can understand which of our predictors were significant: in this case, minority status, kindergarten scores, and SES all significantly predict the gain in scores between kindergarten and first grade. 
+
+
+# Conclusion
+
+In this tutorial, we learned what linear mixed effects models are, when and why we need to use them, how random effects work, and how to implement statistical analyses with linear mixed effects models in R, using the SII dataset of student math scores as an example. 
+
+Linear mixed effects models are a powerful statistical tool, especially for complex datasets with nesting structure or repeated measurements, and learning how to implement them is helpful for performing analyses in complex datasets. While powerful, these models still operate within the frequentist framework and have several of the limitations associated with linear regression, so depending on your research questions and design, alternative methods like hierarchical Bayesian models might be more appropriate. 
 
 
 # References
